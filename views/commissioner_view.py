@@ -6,7 +6,6 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
     st.markdown("## 🏛️ State Health Command Center")
     st.caption("Macro Executive Surveillance across Nasarawa State Facilities")
     
-    # Check for empty encounters dataset
     if df_encounters is None or df_encounters.empty:
         st.warning("⚠️ No encounter data available for the selected filters.")
         return
@@ -19,7 +18,7 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
     nashia_coverage = round((nashia_count / total_visits * 100), 1) if total_visits > 0 else 0.0
     avg_wait = round(df_encounters['Wait_Time_Mins'].mean(), 1) if total_visits > 0 else 0.0
     
-    # Executive Briefing
+    # Narrative Briefing Box
     narrative_html = (
         f"State health facilities logged <b>{total_visits:,} total patient visits</b>. "
         f"<b>{top_disease}</b> represents the leading burden of disease. "
@@ -37,7 +36,7 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
         unsafe_allow_html=True
     )
     
-    # PDF Generator Action
+    # PDF Generator
     pdf_plain = narrative_html.replace('<b>', '').replace('</b>', '')
     pdf_kpis = {
         "Total Patients Seen": f"{total_visits:,}",
@@ -62,7 +61,7 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
     
     st.markdown("---")
     
-    # CLEAN 4-COLUMN KPI GRID
+    # 4-Column Clean KPI Grid (No Active Practitioners)
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Patients Visited", f"{total_visits:,}")
     c2.metric("Leading Disease Burden", top_disease)
@@ -104,7 +103,6 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
                 textinfo='percent',
                 hovertemplate="<b>%{label}</b><br>Patients: %{value:,}<br>Share: %{percent}"
             )
-            # FIXED: Removed non-existent axis_title parameters from pie chart layout
             fig_fac.update_layout(
                 height=380, 
                 margin=dict(l=30, r=30, t=30, b=50), 
