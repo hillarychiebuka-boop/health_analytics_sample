@@ -5,7 +5,7 @@ from utils.pdf_exporter import generate_executive_pdf
 
 def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     st.markdown("## 🏥 Hospital CMD Executive Command View")
-    st.caption("Operational Throughput, Appointments Across Clinics, Billings, and Prescriptions")
+    st.caption("Operational Throughput, Financial Billings, and Clinical Specialty Capacity")
     
     hospitals = df_encounters['Hospital'].unique() if not df_encounters.empty else ["State House Medical Center"]
     selected_hosp = st.selectbox("Select Target Hospital Facility", hospitals, index=0)
@@ -25,10 +25,10 @@ def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     avg_lab_tat = round(h_lab['Turnaround_Hours'].mean(), 1) if not h_lab.empty else 0.0
     
     narrative_html = (
-        f"<b>{selected_hosp}</b> logged <b>{total_visits:,} patient visits / appointments</b>. "
-        f"The digital EMR logging compliance rate is <b>{emr_adoption}%</b>. "
-        f"Gross revenue billing total is <b>{total_billing}</b> across <b>{prescriptions_count:,} pharmacy prescriptions issued</b>, "
-        f"with laboratory test turnaround averaging <b>{avg_lab_tat} hours</b>."
+        f"<b>{selected_hosp}</b> recorded <b>{total_visits:,} total patient visits</b>. "
+        f"The EMR digital logging rate stands at <b>{emr_adoption}%</b>. "
+        f"Gross billings reached <b>{total_billing}</b> across <b>{prescriptions_count:,} pharmacy prescriptions</b>, "
+        f"with diagnostic laboratory turnaround averaging <b>{avg_lab_tat} hours</b>."
     )
     
     st.markdown(
@@ -53,7 +53,7 @@ def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     
     pdf_bytes = generate_executive_pdf(
         title=f"CMD Operational Brief: {selected_hosp}",
-        subtitle="Facility Revenue, Appointments per Specialty, and Care Quality Report",
+        subtitle="Facility Revenue, Clinical Appointments, and Care Quality Report",
         kpi_dict=pdf_kpis,
         narrative_summary=pdf_plain
     )
@@ -67,10 +67,10 @@ def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     
     st.markdown("---")
     
-    # Executive Key Operational Indicators
+    # Detailed Operational Metrics
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Patients Visited", f"{total_visits:,}")
-    k2.metric("EMR Logging Rate", f"{emr_adoption}%", "Target >85%")
+    k2.metric("EMR Adoption Rate", f"{emr_adoption}%", "Target >85%")
     k3.metric("Gross Billings", total_billing)
     k4.metric("Prescriptions Issued", f"{prescriptions_count:,}")
     k5.metric("Lab Turnaround", f"{avg_lab_tat} hrs", "SLA <2.0 hrs")
@@ -80,16 +80,16 @@ def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Appointments & Patient Inflow by Specialty Clinic")
+        st.subheader("Appointments & Patient Inflow per Clinic Unit")
         df_dept = h_enc['Department'].value_counts().reset_index()
         df_dept.columns = ['Clinic Specialty', 'Appointments / Patients Visited']
         fig_dept = px.bar(
             df_dept, x='Clinic Specialty', y='Appointments / Patients Visited', 
-            color='Appointments / Patients Visited', color_continuous_scale='Blues'
+            color='Appointments / Patients Visited', color_continuous_scale='greens', text='Appointments / Patients Visited'
         )
         fig_dept.update_layout(
-            xaxis_title="Clinic Specialty Department",
-            yaxis_title="Total Appointments / Patients Visited",
+            xaxis_title="Clinic Department Unit",
+            yaxis_title="Total Patients Visited",
             height=340, margin=dict(l=20, r=20, t=30, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig_dept, use_container_width=True)
@@ -100,10 +100,10 @@ def render_cmd_view(df_encounters, df_pharmacy, df_lab):
         group_labels = ['Consultation Wait Time']
         
         fig_wait = ff.create_distplot(hist_data, group_labels, show_hist=False, show_rug=False, colors=['#0284C7'])
-        # Clearly labeled axes
+        # Fully labeled axes for professional clarity
         fig_wait.update_layout(
-            xaxis_title="Wait Time Duration (Minutes)",
-            yaxis_title="Probability Density",
+            xaxis_title="Consultation Wait Time (Minutes)",
+            yaxis_title="Density Probability Distribution",
             height=340, margin=dict(l=20, r=20, t=30, b=20), 
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False
         )
