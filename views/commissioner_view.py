@@ -59,7 +59,7 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Total Patients Visited", f"{total_visits:,}")
     m2.metric("NASHIA Coverage", f"{nashia_coverage}%")
-    m3.metric("Active Duty Practitioners", "142 Doctors / Nurses")
+    m3.metric("Active Duty Practitioners", "142")
     m4.metric("Avg Statewide Wait Time", f"{avg_wait} mins")
     
     st.markdown("---")
@@ -82,24 +82,25 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
         st.plotly_chart(fig_disease, use_container_width=True)
         
     with col2:
-        st.subheader("Facility Inflow & Share Distribution")
-        df_facility = df_encounters.groupby('Hospital').size().reset_index(name='Patients Visited')
+        # Replaced Donut with Clean Horizontal Bar Chart for Facility Inflow
+        st.subheader("Facility Patient Inflow & Share Distribution")
+        df_facility = df_encounters.groupby('Hospital').size().reset_index(name='Patients Visited').sort_values('Patients Visited', ascending=True)
         
-        # Donut chart with legends enabled
-        fig_fac = px.pie(
-            df_facility, names='Hospital', values='Patients Visited', hole=0.5,
-            color_discrete_sequence=px.colors.qualitative.Set2
-        )
-        fig_fac.update_traces(textinfo='percent+label')
-        fig_fac.update_layout(
-            height=360, 
-            margin=dict(l=10, r=10, t=30, b=10), 
-            showlegend=True, 
-            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig_fac, use_container_width=True)
-
+        if not df_facility.empty:
+            fig_fac = px.bar(
+                df_facility, x='Patients Visited', y='Hospital', orientation='h',
+                color='Patients Visited', color_continuous_scale='Blues'
+            )
+            fig_fac.update_layout(
+                xaxis_title="Patients Visited",
+                yaxis_title="Facility / Hospital",
+                height=380, margin=dict(l=20, r=20, t=30, b=20), 
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+            )
+            st.plotly_chart(fig_fac, use_container_width=True)
+        else:
+            st.info("No facility data available.")
+        
     st.markdown("---")
     
     # Demographic & Patient Engagement Module
@@ -112,11 +113,12 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
             "Age Bracket": ["0-12 yrs (Pediatrics)", "13-25 yrs (Youth)", "26-50 yrs (Adults)", "51+ yrs (Seniors)"],
             "Patients": [int(total_visits * 0.28), int(total_visits * 0.22), int(total_visits * 0.35), int(total_visits * 0.15)]
         })
-        fig_age = px.bar(age_groups, x="Age Bracket", y="Patients", color="Age Bracket", color_discrete_sequence=px.colors.qualitative.Blues_r)
-        fig_age.update_layout(
-            xaxis_title="Age Demographic Group",
-            yaxis_title="Total Patients Seen",
-            height=300, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+        fig_age = px.bar(
+            age_groups, 
+            x="Age Bracket", 
+            y="Patients", 
+            color="Age Bracket", 
+            color_discrete_sequence=px.colors.qualitative.Bold
         )
         st.plotly_chart(fig_age, use_container_width=True)
         
