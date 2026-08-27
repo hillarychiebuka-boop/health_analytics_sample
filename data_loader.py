@@ -1,128 +1,151 @@
-import pandas as pd
 import numpy as np
-import streamlit as st
+import pandas as pd
 from datetime import datetime, timedelta
 
-# TOGGLE THIS SWITCH WHEN ON-PREMISES CLOUD ACCESS IS PROVIDED
-USE_LIVE_DATABASE = False  
-
-@st.cache_data
-def load_healthcare_data():
-    """
-    Decoupled Healthcare Data Architecture.
-    Swaps between synthetic mock data and live database connectors seamlessly.
-    """
-    if USE_LIVE_DATABASE:
-        return _fetch_live_cloud_data()
-    else:
-        return _generate_synthetic_data()
-
-def _fetch_live_cloud_data():
-    """
-    Placeholder for live MongoDB / SQL cloud database connector.
-    Uncomment and insert credentials once SHMC on-premises connection is verified.
-    """
-    # Example MongoDB Connection pattern:
-    # from pymongo import MongoClient
-    # client = MongoClient("mongodb://username:password@on-premises-cloud-ip:27017/")
-    # db = client["shmc_healthcare_db"]
-    # df_encounters = pd.DataFrame(list(db.encounters.find()))
-    # df_pharmacy = pd.DataFrame(list(db.pharmacy.find()))
-    # df_lab = pd.DataFrame(list(db.laboratory.find()))
-    # return df_encounters, df_pharmacy, df_lab
-    pass
-
-def _generate_synthetic_data():
+def generate_synthetic_healthcare_data(num_records=1500):
     np.random.seed(42)
     
-    end_date = datetime(2026, 8, 26)
-    start_date = end_date - timedelta(days=730)
-    date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-    
-    hospitals = [
-        "State House Medical Center", 
-        "Lafia Specialist Hospital", 
-        "Keffi General Hospital", 
+    # 1. Nasarawa State & FCT Facilities
+    facilities = [
+        "Dalhatu Araf Specialist Hospital (DASH), Lafia",
+        "Federal Medical Centre, Keffi",
+        "General Hospital, Karu",
         "Akwanga General Hospital"
     ]
     
-    departments = ["General Outpatient", "Pediatrics", "Obstetrics & Gynecology", "Accident & Emergency", "Internal Medicine"]
-    pay_types = ["Nasarawa Health Insurance Scheme (NASHIA)", "NHIS", "Out-of-Pocket", "Private HMO"]
-    
-    diseases = [
-        "Malaria (P. falciparum)", 
-        "Acute Upper Respiratory Infection", 
-        "Gastroenteritis / Diarrhea", 
-        "Hepatitis B Surface Antigen (HBsAg)", 
-        "Typhoid Fever", 
-        "Hypertension / Cardiovascular", 
-        "Lassa Fever (Suspected/Confirmed)", 
-        "Dermatitis / Scabies"
-    ]
-    disease_weights = [0.48, 0.15, 0.12, 0.08, 0.07, 0.05, 0.02, 0.03]
-    
-    drugs_catalog = [
-        {"name": "Artemether/Lumefantrine 80/480mg", "price": 1800, "category": "Antimalarial"},
-        {"name": "Paracetamol 500mg Tabs", "price": 300, "category": "Analgesic"},
-        {"name": "Amoxicillin/Clavulanate 625mg", "price": 3500, "category": "Antibiotic"},
-        {"name": "Ciprofloxacin 500mg", "price": 1200, "category": "Antibiotic"},
-        {"name": "Metformin 500mg", "price": 1500, "category": "Antidiabetic"},
-        {"name": "Amlodipine 5mg", "price": 1000, "category": "Antihypertensive"}
+    # 2. Specialties / Departments
+    departments = [
+        "General Outpatient (GOPD)",
+        "Pediatrics",
+        "Obstetrics & Gynecology (ANC)",
+        "Internal Medicine",
+        "Accident & Emergency (A&E)",
+        "Immunization & Child Welfare"
     ]
     
-    encounter_records = []
-    pharmacy_records = []
-    lab_records = []
+    # 3. Disease Burden (Local Profile)
+    diagnoses = [
+        "Uncomplicated Malaria",
+        "Essential Hypertension",
+        "Acute Respiratory Infection",
+        "Type 2 Diabetes Mellitus",
+        "Gastroenteritis",
+        "Antenatal Care Routine"
+    ]
     
-    for single_date in date_range:
-        is_rainy = single_date.month in [5, 6, 7, 8, 9, 10]
+    # 4. Nigerian Payer Landscape
+    payers = [
+        "Nasarawa Health Insurance Scheme (NASHIA)",
+        "NHIA (Federal Sector)",
+        "Out-of-Pocket (Self-Pay)",
+        "Private HMO Coverage"
+    ]
+    payer_probs = [0.35, 0.20, 0.35, 0.10]
+    
+    # 5. Age Groups & Gender Cohorts
+    age_groups = ["0-5 yrs (Pediatric)", "6-17 yrs (Adolescent)", "18-45 yrs (Adult)", "46-60 yrs (Mature)", "60+ yrs (Geriatric)"]
+    age_probs = [0.22, 0.13, 0.40, 0.15, 0.10]
+    genders = ["Female", "Male"]
+    
+    # 6. Appointment Types & Engagement Status
+    appointment_types = ["Scheduled Follow-up", "Walk-in Emergency", "Routine ANC/Immunization", "Referral Specialist"]
+    engagement_status = ["Attended", "Attended", "Attended", "No-Show / Rescheduled"]
+    
+    # Timestamps over last 30 days
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+    
+    dates = [start_date + timedelta(seconds=np.random.randint(0, int((end_date - start_date).total_seconds()))) for _ in range(num_records)]
+    dates.sort()
+    
+    # --- ENCOUNTERS DATAFRAME ---
+    encounters = []
+    for i in range(num_records):
+        enc_id = f"ENC-NG-{10000 + i}"
+        pat_id = f"PAT-NAS-{np.random.randint(1000, 4000)}"
+        hosp = np.random.choice(facilities, p=[0.40, 0.30, 0.18, 0.12])
+        dept = np.random.choice(departments)
+        diag = np.random.choice(diagnoses, p=[0.30, 0.20, 0.15, 0.12, 0.13, 0.10])
+        payer = np.random.choice(payers, p=payer_probs)
         
-        for hosp in hospitals:
-            daily_count = np.random.randint(50, 140)
-            
-            for _ in range(daily_count):
-                weights = disease_weights.copy()
-                if is_rainy:
-                    weights[0] = 0.55  # Increase malaria weight
-                    # Re-normalize weights so the sum strictly equals 1.0
-                    total_w = sum(weights)
-                    weights = [w / total_w for w in weights]
-                
-                diagnosis = np.random.choice(diseases, p=weights)
-                payer = np.random.choice(pay_types, p=[0.45, 0.25, 0.20, 0.10])
-                wait_time = max(10, int(np.random.normal(45, 15)))
-                billing = np.random.choice([0, 1500, 3500, 8500, 25000], p=[0.25, 0.35, 0.25, 0.10, 0.05])
-                
-                encounter_records.append({
-                    "Date": single_date,
-                    "Hospital": hosp,
-                    "Department": np.random.choice(departments),
-                    "Diagnosis": diagnosis,
-                    "Payer": payer,
-                    "Wait_Time_Mins": wait_time,
-                    "Billing_Amount": billing,
-                    "EMR_Logged": np.random.choice([True, False], p=[0.88, 0.12])
-                })
-                
-                if np.random.rand() < 0.70:
-                    selected_drug = np.random.choice(drugs_catalog)
-                    pharmacy_records.append({
-                        "Date": single_date,
-                        "Hospital": hosp,
-                        "Drug_Name": selected_drug["name"],
-                        "Category": selected_drug["category"],
-                        "Quantity": np.random.randint(1, 4),
-                        "Unit_Price": selected_drug["price"],
-                        "Is_Subsidized": (payer in ["Nasarawa Health Insurance Scheme (NASHIA)", "NHIS"])
-                    })
-                
-                if np.random.rand() < 0.50:
-                    lab_records.append({
-                        "Date": single_date,
-                        "Hospital": hosp,
-                        "Test_Name": "Malaria MP Microscopy" if diagnosis == "Malaria (P. falciparum)" else np.random.choice(["FBC", "Urinalysis", "LFT", "HBsAg Screening"]),
-                        "Turnaround_Hours": round(np.random.uniform(0.5, 3.5), 1),
-                        "Status": np.random.choice(["Completed", "Pending"], p=[0.94, 0.06])
-                    })
-
-    return pd.DataFrame(encounter_records), pd.DataFrame(pharmacy_records), pd.DataFrame(lab_records)
+        age_group = np.random.choice(age_groups, p=age_probs)
+        gender = np.random.choice(genders, p=[0.54, 0.46])
+        appt_type = np.random.choice(appointment_types, p=[0.35, 0.30, 0.25, 0.10])
+        status = np.random.choice(engagement_status, p=[0.75, 0.10, 0.05, 0.10])
+        
+        wait_time = int(np.random.normal(loc=42, scale=15)) # Avg wait in mins
+        wait_time = max(10, min(wait_time, 140))
+        
+        billing = round(float(np.random.exponential(scale=8500) + 1500), 2) # NGN
+        emr_logged = np.random.choice([True, False], p=[0.88, 0.12])
+        
+        encounters.append({
+            "Encounter_ID": enc_id,
+            "Patient_ID": pat_id,
+            "Date": dates[i].date(),
+            "Timestamp": dates[i],
+            "Hospital": hosp,
+            "Department": dept,
+            "Diagnosis": diag,
+            "Payer": payer,
+            "Age_Group": age_group,
+            "Gender": gender,
+            "Appointment_Type": appt_type,
+            "Engagement_Status": status,
+            "Wait_Time_Mins": wait_time,
+            "Billing_Amount": billing,
+            "EMR_Logged": emr_logged
+        })
+        
+    df_encounters = pd.DataFrame(encounters)
+    
+    # --- PHARMACY ORDERS DATAFRAME ---
+    drugs = [
+        ("Artemether-Lumefantrine 80/480mg", "Antimalarial", 2500.00),
+        ("Paracetamol 500mg", "Analgesic", 500.00),
+        ("Amlodipine 10mg", "Antihypertensive", 1800.00),
+        ("Metformin 500mg", "Antidiabetic", 2200.00),
+        ("Amoxicillin-Clavulanate 625mg", "Antibiotic", 4500.00)
+    ]
+    
+    pharmacy_orders = []
+    for idx, row in df_encounters.sample(frac=0.70).iterrows():
+        drug_info = drugs[np.random.randint(0, len(drugs))]
+        qty = np.random.choice([1, 2, 3, 4], p=[0.5, 0.3, 0.15, 0.05])
+        pharmacy_orders.append({
+            "Order_ID": f"RX-NG-{20000 + idx}",
+            "Encounter_ID": row["Encounter_ID"],
+            "Hospital": row["Hospital"],
+            "Date": row["Date"],
+            "Drug_Name": drug_info[0],
+            "Category": drug_info[1],
+            "Quantity": qty,
+            "Unit_Price": drug_info[2],
+            "Is_Subsidized": True if row["Payer"] in ["Nasarawa Health Insurance Scheme (NASHIA)", "NHIA (Federal Sector)"] else False
+        })
+        
+    df_pharmacy = pd.DataFrame(pharmacy_orders)
+    
+    # --- LABORATORY ORDERS DATAFRAME ---
+    labs = ["Malaria RDT / Microscopy", "Full Blood Count (FBC)", "Fasting Blood Sugar (FBS)", "Widal Test", "Urinalysis"]
+    
+    lab_orders = []
+    for idx, row in df_encounters.sample(frac=0.55).iterrows():
+        test = np.random.choice(labs)
+        tat = round(float(np.random.normal(loc=1.5, scale=0.4)), 1)
+        tat = max(0.3, tat)
+        status = np.random.choice(["Completed", "Pending"], p=[0.90, 0.10])
+        
+        lab_orders.append({
+            "Lab_ID": f"LAB-NG-{30000 + idx}",
+            "Encounter_ID": row["Encounter_ID"],
+            "Hospital": row["Hospital"],
+            "Date": row["Date"],
+            "Test_Name": test,
+            "Turnaround_Hours": tat,
+            "Status": status
+        })
+        
+    df_lab = pd.DataFrame(lab_orders)
+    
+    return df_encounters, df_pharmacy, df_lab
