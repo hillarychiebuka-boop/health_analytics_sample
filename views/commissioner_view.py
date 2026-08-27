@@ -1,23 +1,23 @@
 import streamlit as st
 import plotly.express as px
-import numpy as np
-import pandas as pd
 from utils.pdf_exporter import generate_executive_pdf
 
 def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
     st.markdown("## 🏛️ State Health Command Center")
-    st.caption("Macro Executive Surveillance & Health Workforce Capacity Across Nasarawa State Facilities")
+    st.caption("Macro Executive Surveillance across Nasarawa State Facilities")
     
+    # Core High-Level Aggregates
     total_visits = len(df_encounters)
     top_disease = df_encounters['Diagnosis'].mode()[0] if not df_encounters.empty else "N/A"
     nashia_coverage = round((len(df_encounters[df_encounters['Payer'] == 'Nasarawa Health Insurance Scheme (NASHIA)']) / total_visits * 100), 1) if total_visits > 0 else 0
     avg_wait = round(df_encounters['Wait_Time_Mins'].mean(), 1) if total_visits > 0 else 0
     
+    # Clean Narrative Briefing Box
     narrative_html = (
         f"State health facilities logged <b>{total_visits:,} total patient visits</b>. "
-        f"<b>{top_disease}</b> remains the primary clinical burden. "
-        f"NASHIA Health Insurance coverage is currently at <b>{nashia_coverage}%</b>, "
-        f"with average consultation wait times standing at <b>{avg_wait} minutes</b>."
+        f"<b>{top_disease}</b> represents the leading burden of disease. "
+        f"State Health Insurance (NASHIA) coverage stands at <b>{nashia_coverage}%</b> of total patient visits, "
+        f"while average statewide consultation wait time is <b>{avg_wait} minutes</b>."
     )
     
     st.markdown(
@@ -30,18 +30,18 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
         unsafe_allow_html=True
     )
     
-    # PDF Generator
+    # PDF Generator Action
     pdf_plain = narrative_html.replace('<b>', '').replace('</b>', '')
     pdf_kpis = {
         "Total Patients Seen": f"{total_visits:,}",
-        "Leading Diagnosis": top_disease,
+        "Leading Burden of Disease": top_disease,
         "NASHIA Insurance Coverage": f"{nashia_coverage}%",
         "Statewide Avg Wait Time": f"{avg_wait} mins"
     }
     
     pdf_bytes = generate_executive_pdf(
         title="State Ministry of Health Executive Brief",
-        subtitle="Nasarawa State Healthcare Performance Summary",
+        subtitle="Nasarawa State Macro Healthcare Performance Summary",
         kpi_dict=pdf_kpis,
         narrative_summary=pdf_plain
     )
@@ -55,12 +55,12 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
     
     st.markdown("---")
     
-    # State Macro KPIs
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Patients Visited", f"{total_visits:,}")
-    m2.metric("NASHIA Coverage", f"{nashia_coverage}%")
-    m3.metric("Active Duty Practitioners", "142 Doctors / Nurses")
-    m4.metric("Avg Statewide Wait Time", f"{avg_wait} mins")
+    # Commissioner Level High-Level KPIs
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Patients Visited", f"{total_visits:,}")
+    c2.metric("Leading Disease Burden", top_disease)
+    c3.metric("NASHIA Coverage Rate", f"{nashia_coverage}%")
+    c4.metric("Avg Statewide Wait Time", f"{avg_wait} mins")
     
     st.markdown("---")
     
@@ -69,67 +69,39 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
     with col1:
         st.subheader("Disease Surveillance & Outbreak Tracking")
         df_disease = df_encounters['Diagnosis'].value_counts().reset_index()
-        df_disease.columns = ['Diagnosis', 'Patients Seen']
+        df_disease.columns = ['Diagnosis', 'Patients Visited']
         fig_disease = px.bar(
-            df_disease, x='Patients Seen', y='Diagnosis', orientation='h',
-            color='Patients Seen', color_continuous_scale='Reds'
+            df_disease, x='Patients Visited', y='Diagnosis', orientation='h',
+            color='Patients Visited', color_continuous_scale='Reds'
         )
         fig_disease.update_layout(
             xaxis_title="Number of Patients Visited",
             yaxis_title="Clinical Diagnosis",
-            height=360, margin=dict(l=20, r=20, t=30, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+            height=380, margin=dict(l=20, r=20, t=30, b=20), 
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig_disease, use_container_width=True)
         
     with col2:
-        st.subheader("Facility Inflow & Share Distribution")
+        st.subheader("Facility Patient Share Distribution")
         df_facility = df_encounters.groupby('Hospital').size().reset_index(name='Patients Visited')
         
-        # Donut chart with legends enabled
+        # HealthStack Donut Chart Engine Parameters
         fig_fac = px.pie(
-            df_facility, names='Hospital', values='Patients Visited', hole=0.5,
-            color_discrete_sequence=px.colors.qualitative.Set2
+            df_facility, names='Hospital', values='Patients Visited', hole=0.6,
+            color_discrete_sequence=px.colors.qualitative.Bold
         )
-        fig_fac.update_traces(textinfo='percent+label')
+        # Prevents squeeze: puts text on outside callouts and relies on bottom legend
+        fig_fac.update_traces(
+            textposition='outside', 
+            textinfo='percent',
+            hovertemplate="<b>%{label}</b><br>Patients: %{value:,}<br>Share: %{percent}"
+        )
         fig_fac.update_layout(
-            height=360, 
-            margin=dict(l=10, r=10, t=30, b=10), 
+            height=380, 
+            margin=dict(l=30, r=30, t=30, b=50), 
             showlegend=True, 
-            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+            legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5),
             paper_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig_fac, use_container_width=True)
-
-    st.markdown("---")
-    
-    # Demographic & Patient Engagement Module
-    st.subheader("👥 Patient Demographics & Health Workforce Distribution")
-    c_demo1, c_demo2 = st.columns(2)
-    
-    with c_demo1:
-        # Age Distribution
-        age_groups = pd.DataFrame({
-            "Age Bracket": ["0-12 yrs (Pediatrics)", "13-25 yrs (Youth)", "26-50 yrs (Adults)", "51+ yrs (Seniors)"],
-            "Patients": [int(total_visits * 0.28), int(total_visits * 0.22), int(total_visits * 0.35), int(total_visits * 0.15)]
-        })
-        fig_age = px.bar(age_groups, x="Age Bracket", y="Patients", color="Age Bracket", color_discrete_sequence=px.colors.qualitative.Blues_r)
-        fig_age.update_layout(
-            xaxis_title="Age Demographic Group",
-            yaxis_title="Total Patients Seen",
-            height=300, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig_age, use_container_width=True)
-        
-    with c_demo2:
-        # Active Health Workforce Breakdown
-        workforce = pd.DataFrame({
-            "Cadre": ["Medical Officers", "Consultants", "Nurses/Midwives", "Pharmacists", "Lab Scientists"],
-            "Active On-Duty": [45, 18, 52, 14, 13]
-        })
-        fig_staff = px.pie(workforce, names="Cadre", values="Active On-Duty", hole=0.45, color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig_staff.update_layout(
-            height=300, showlegend=True, 
-            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig_staff, use_container_width=True)
