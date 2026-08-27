@@ -126,3 +126,4 @@ def generate_synthetic_healthcare_data(num_records=1500):
                     })
 
     return pd.DataFrame(encounter_records), pd.DataFrame(pharmacy_records), pd.DataFrame(lab_records)
+    load_healthcare_data = generate_synthetic_healthcare_data
