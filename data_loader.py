@@ -32,7 +32,7 @@ def _fetch_live_cloud_data():
     # return df_encounters, df_pharmacy, df_lab
     pass
 
-def _generate_synthetic_data():
+def generate_synthetic_healthcare_data(num_records=1500):
     np.random.seed(42)
     
     end_date = datetime(2026, 8, 26)
