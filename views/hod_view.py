@@ -1,10 +1,11 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
+from utils.pdf_exporter import generate_executive_pdf
 
 def render_hod_view(df_encounters, df_pharmacy, df_lab):
     st.markdown("## ⚙️ Departmental HOD Operational Portal")
-    st.caption("Granular operational tracking for Records, Pharmacy, and Laboratory Units")
+    st.caption("Detailed departmental tracking for Records, Pharmacy Inventory, and Diagnostic Laboratory Units")
     
     hospitals = df_encounters['Hospital'].unique() if not df_encounters.empty else ["State House Medical Center"]
     
@@ -31,27 +32,27 @@ def render_hod_view(df_encounters, df_pharmacy, df_lab):
         completeness = "96.4%"
         
         narrative_html = (
-            f"<b>{selected_hosp} Records Unit</b> processed <b>{total_reg:,} patient registrations</b>. "
-            f"Paper fallbacks were kept to <b>{paper_fallback:,} records</b>. "
-            f"Data completeness score stands at <b>{completeness}</b>."
+            f"<b>{selected_hosp} Records Unit</b> registered <b>{total_reg:,} patient visits</b>. "
+            f"Paper fallback records were limited to <b>{paper_fallback:,} instances</b>. "
+            f"Overall EMR data completeness score stands at <b>{completeness}</b>."
         )
         st.markdown(f'<div style="background-color: #0F172A; border-left: 5px solid #0284C7; padding: 12px; border-radius: 6px; margin-bottom: 12px; color: #E2E8F0;">{narrative_html}</div>', unsafe_allow_html=True)
         
         c1, c2, c3 = st.columns(3)
-        c1.metric("Patients Registered / Visited", f"{total_reg:,}")
+        c1.metric("Total Patients Seen", f"{total_reg:,}")
         c2.metric("Paper Chart Fallbacks", f"{paper_fallback:,}", "Target: 0")
-        c3.metric("Data Quality Score", completeness)
+        c3.metric("Data Completeness Score", completeness)
         
         st.subheader("Daily Outpatient Registration Inflow Trend")
         df_daily = h_enc.groupby('Date').size().reset_index(name='Patients Visited')
         fig_reg = px.area(df_daily, x='Date', y='Patients Visited', color_discrete_sequence=['#10B981'])
         fig_reg.update_layout(
-            xaxis_title="Date", yaxis_title="Patients Visited",
+            xaxis_title="Date Horizon", yaxis_title="Patients Visited",
             height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig_reg, use_container_width=True)
         
-        st.subheader("📋 Outpatient Registration Logs")
+        st.subheader("📋 Raw Outpatient Registration Spreadsheet")
         st.dataframe(h_enc[['Date', 'Department', 'Diagnosis', 'Payer', 'EMR_Logged']], use_container_width=True)
 
     # ---------------------------------------------------------
@@ -63,18 +64,20 @@ def render_hod_view(df_encounters, df_pharmacy, df_lab):
         items_disp = h_pharm['Quantity'].sum() if not h_pharm.empty else 0
         total_prescriptions = len(h_pharm) if not h_pharm.empty else 0
         subsidized_val = (h_pharm[h_pharm['Is_Subsidized']]['Quantity'] * h_pharm[h_pharm['Is_Subsidized']]['Unit_Price']).sum() if not h_pharm.empty else 0
+        stockout_risk_items = 2
         
         narrative_html = (
             f"<b>{selected_hosp} Pharmacy</b> fulfilled <b>{total_prescriptions:,} prescriptions</b> "
             f"totaling <b>{items_disp:,} medication units</b> dispensed. "
-            f"Subsidized/NASHIA care waiver absorption reached <b>₦{subsidized_val:,}</b>."
+            f"NASHIA/Subsidized waiver absorption reached <b>₦{subsidized_val:,}</b>."
         )
         st.markdown(f'<div style="background-color: #0F172A; border-left: 5px solid #0284C7; padding: 12px; border-radius: 6px; margin-bottom: 12px; color: #E2E8F0;">{narrative_html}</div>', unsafe_allow_html=True)
         
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Prescriptions Processed", f"{total_prescriptions:,}")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Prescriptions Fulfilled", f"{total_prescriptions:,}")
         c2.metric("Medication Units Dispensed", f"{items_disp:,}")
-        c3.metric("Subsidized Care Waiver", f"₦{subsidized_val:,}")
+        c3.metric("Subsidized Waiver Value", f"₦{subsidized_val:,}")
+        c4.metric("Stockout Risk Items", f"{stockout_risk_items}", "Action Required", delta_color="inverse")
         
         st.markdown("---")
         
@@ -87,31 +90,24 @@ def render_hod_view(df_encounters, df_pharmacy, df_lab):
                 fig_drug = px.bar(df_drug, x='Quantity', y='Drug_Name', orientation='h', color_discrete_sequence=['#6366F1'])
                 fig_drug.update_layout(
                     xaxis_title="Units Dispensed", yaxis_title="Medication Name",
-                    height=340, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+                    height=320, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
                 st.plotly_chart(fig_drug, use_container_width=True)
                 
         with col_p2:
-            st.subheader("Medication Category Breakdown")
+            st.subheader("Medication Category Distribution (Donut Chart)")
             df_cat = h_pharm.groupby('Category')['Quantity'].sum().reset_index() if not h_pharm.empty else pd.DataFrame()
             if not df_cat.empty:
-                fig_cat = px.pie(
-                    df_cat, names='Category', values='Quantity', hole=0.6, 
-                    color_discrete_sequence=px.colors.qualitative.Pastel
-                )
-                fig_cat.update_traces(
-                    textposition='outside', 
-                    textinfo='percent',
-                    hovertemplate="<b>%{label}</b><br>Units: %{value:,}<br>Share: %{percent}"
-                )
+                fig_cat = px.pie(df_cat, names='Category', values='Quantity', hole=0.5, color_discrete_sequence=px.colors.qualitative.Pastel)
+                fig_cat.update_traces(textinfo='percent+label', hovertemplate="<b>%{label}</b><br>Units: %{value}<br>Share: %{percent}")
                 fig_cat.update_layout(
-                    height=340, margin=dict(l=20, r=20, t=30, b=50), showlegend=True, 
-                    legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5),
+                    height=320, showlegend=True, 
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
                     paper_bgcolor='rgba(0,0,0,0)'
                 )
                 st.plotly_chart(fig_cat, use_container_width=True)
             
-        st.subheader("📋 Pharmacy Dispensing Audit Logs")
+        st.subheader("📋 Raw Pharmacy Dispensing Spreadsheet")
         st.dataframe(h_pharm[['Date', 'Drug_Name', 'Category', 'Quantity', 'Unit_Price', 'Is_Subsidized']], use_container_width=True)
 
     # ---------------------------------------------------------
@@ -125,38 +121,32 @@ def render_hod_view(df_encounters, df_pharmacy, df_lab):
         pending_queue = len(h_lab[h_lab['Status'] == 'Pending']) if total_tests > 0 else 0
         
         narrative_html = (
-            f"<b>{selected_hosp} Laboratory</b> processed <b>{total_tests:,} test requests</b> "
-            f"with an average order-to-result turnaround of <b>{avg_tat} hours</b>. "
-            f"Pending lab queue stands at <b>{pending_queue} requests</b>."
+            f"<b>{selected_hosp} Laboratory</b> processed <b>{total_tests:,} test orders</b> "
+            f"with an average turnaround of <b>{avg_tat} hours</b>. "
+            f"Current pending queue stands at <b>{pending_queue} active requests</b>."
         )
         st.markdown(f'<div style="background-color: #0F172A; border-left: 5px solid #0284C7; padding: 12px; border-radius: 6px; margin-bottom: 12px; color: #E2E8F0;">{narrative_html}</div>', unsafe_allow_html=True)
         
         c1, c2, c3 = st.columns(3)
         c1.metric("Tests Processed", f"{total_tests:,}")
         c2.metric("Avg Turnaround Time", f"{avg_tat} hrs", "SLA <2.0 hrs")
-        c3.metric("Pending Queue", f"{pending_queue}")
+        c3.metric("Pending Result Queue", f"{pending_queue}")
         
         st.markdown("---")
         
-        st.subheader("Diagnostic Test Type Distribution")
+        st.subheader("Diagnostic Test Volume Distribution (Donut Chart)")
         df_test = h_lab['Test_Name'].value_counts().reset_index() if not h_lab.empty else pd.DataFrame()
         if not df_test.empty:
             df_test.columns = ['Test_Name', 'Count']
-            fig_lab = px.pie(
-                df_test, names='Test_Name', values='Count', hole=0.6, 
-                color_discrete_sequence=px.colors.qualitative.Set3
-            )
-            fig_lab.update_traces(
-                textposition='outside', 
-                textinfo='percent',
-                hovertemplate="<b>%{label}</b><br>Tests: %{value:,}<br>Share: %{percent}"
-            )
+            fig_lab = px.pie(df_test, names='Test_Name', values='Count', hole=0.55, color_discrete_sequence=px.colors.qualitative.Set3)
+            fig_lab.update_traces(textinfo='percent+label', hovertemplate="<b>%{label}</b><br>Tests: %{value}<br>Share: %{percent}")
             fig_lab.update_layout(
-                height=360, margin=dict(l=20, r=20, t=30, b=50), showlegend=True, 
-                legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5),
+                height=350, showlegend=True, 
+                legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
                 paper_bgcolor='rgba(0,0,0,0)'
             )
             st.plotly_chart(fig_lab, use_container_width=True)
             
-        st.subheader("📋 Diagnostic Laboratory Order Logs")
+        st.subheader("📋 Raw Diagnostic Order Log Spreadsheet")
         st.dataframe(h_lab[['Date', 'Test_Name', 'Turnaround_Hours', 'Status']], use_container_width=True)
+        
