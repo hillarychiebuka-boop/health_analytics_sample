@@ -5,7 +5,7 @@ from utils.pdf_exporter import generate_executive_pdf
 
 def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     st.markdown("## 🏥 Hospital CMD Executive Command View")
-    st.caption("Operational Throughput, Financial Billings, Workforce & Specialty Performance")
+    st.caption("Operational Throughput, Appointments Across Clinics, Billings, and Prescriptions")
     
     hospitals = df_encounters['Hospital'].unique() if not df_encounters.empty else ["State House Medical Center"]
     selected_hosp = st.selectbox("Select Target Hospital Facility", hospitals, index=0)
@@ -21,13 +21,14 @@ def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     total_visits = len(h_enc)
     emr_adoption = round((h_enc['EMR_Logged'].sum() / total_visits * 100), 1) if total_visits > 0 else 0
     total_billing = f"₦{h_enc['Billing_Amount'].sum():,}"
-    active_practitioners = 142  # Numeric KPI count for CMD View
+    prescriptions_count = len(h_pharm)
     avg_lab_tat = round(h_lab['Turnaround_Hours'].mean(), 1) if not h_lab.empty else 0.0
     
     narrative_html = (
-        f"<b>{selected_hosp}</b> recorded <b>{total_visits:,} total patient visits</b>. "
-        f"EMR digital adoption stands at <b>{emr_adoption}%</b> across <b>{active_practitioners} active clinical practitioners</b> on duty. "
-        f"Gross revenue billings totaled <b>{total_billing}</b> with diagnostic turnaround averaging <b>{avg_lab_tat} hours</b>."
+        f"<b>{selected_hosp}</b> logged <b>{total_visits:,} patient visits / appointments</b>. "
+        f"The digital EMR logging compliance rate is <b>{emr_adoption}%</b>. "
+        f"Gross revenue billing total is <b>{total_billing}</b> across <b>{prescriptions_count:,} pharmacy prescriptions issued</b>, "
+        f"with laboratory test turnaround averaging <b>{avg_lab_tat} hours</b>."
     )
     
     st.markdown(
@@ -44,15 +45,15 @@ def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     pdf_kpis = {
         "Facility Name": selected_hosp,
         "Total Patients Visited": f"{total_visits:,}",
-        "Active On-Duty Practitioners": f"{active_practitioners}",
         "EMR Adoption Rate": f"{emr_adoption}%",
-        "Gross Billings": total_billing,
+        "Gross Revenue Billing": total_billing,
+        "Prescriptions Fulfilled": f"{prescriptions_count:,}",
         "Avg Diagnostic Turnaround": f"{avg_lab_tat} Hours"
     }
     
     pdf_bytes = generate_executive_pdf(
         title=f"CMD Operational Brief: {selected_hosp}",
-        subtitle="Facility Revenue, Clinical Staffing, and Care Quality Report",
+        subtitle="Facility Revenue, Appointments per Specialty, and Care Quality Report",
         kpi_dict=pdf_kpis,
         narrative_summary=pdf_plain
     )
@@ -66,12 +67,12 @@ def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     
     st.markdown("---")
     
-    # Clean Human-Readable Metrics Grid
+    # Executive Key Operational Indicators
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Patients Visited", f"{total_visits:,}")
-    k2.metric("Active Practitioners", f"{active_practitioners}", "Doctors & Nurses")
-    k3.metric("EMR Adoption Rate", f"{emr_adoption}%", "Target >85%")
-    k4.metric("Gross Billings", total_billing)
+    k2.metric("EMR Logging Rate", f"{emr_adoption}%", "Target >85%")
+    k3.metric("Gross Billings", total_billing)
+    k4.metric("Prescriptions Issued", f"{prescriptions_count:,}")
     k5.metric("Lab Turnaround", f"{avg_lab_tat} hrs", "SLA <2.0 hrs")
     
     st.markdown("---")
@@ -79,30 +80,31 @@ def render_cmd_view(df_encounters, df_pharmacy, df_lab):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Patient Inflow by Clinical Department")
+        st.subheader("Appointments & Patient Inflow by Specialty Clinic")
         df_dept = h_enc['Department'].value_counts().reset_index()
-        df_dept.columns = ['Clinic Specialty', 'Patients Visited']
+        df_dept.columns = ['Clinic Specialty', 'Appointments / Patients Visited']
         fig_dept = px.bar(
-            df_dept, x='Clinic Specialty', y='Patients Visited', 
-            color='Patients Visited', color_continuous_scale='Blues'
+            df_dept, x='Clinic Specialty', y='Appointments / Patients Visited', 
+            color='Appointments / Patients Visited', color_continuous_scale='Blues'
         )
         fig_dept.update_layout(
-            xaxis_title="Clinical Department",
-            yaxis_title="Total Patients Visited",
-            height=350, margin=dict(l=20, r=20, t=30, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+            xaxis_title="Clinic Specialty Department",
+            yaxis_title="Total Appointments / Patients Visited",
+            height=340, margin=dict(l=20, r=20, t=30, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig_dept, use_container_width=True)
         
     with col2:
-        st.subheader("Consultation Wait Time Distribution")
+        st.subheader("Consultation Wait Time Distribution Density")
         hist_data = [h_enc['Wait_Time_Mins'].dropna().tolist()]
         group_labels = ['Consultation Wait Time']
         
         fig_wait = ff.create_distplot(hist_data, group_labels, show_hist=False, show_rug=False, colors=['#0284C7'])
+        # Clearly labeled axes
         fig_wait.update_layout(
-            xaxis_title="Consultation Wait Time (Minutes)",
-            yaxis_title="Density Probability Distribution",
-            height=350, margin=dict(l=20, r=20, t=30, b=20), 
+            xaxis_title="Wait Time Duration (Minutes)",
+            yaxis_title="Probability Density",
+            height=340, margin=dict(l=20, r=20, t=30, b=20), 
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False
         )
         st.plotly_chart(fig_wait, use_container_width=True)
