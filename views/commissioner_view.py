@@ -6,13 +6,20 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
     st.markdown("## 🏛️ State Health Command Center")
     st.caption("Macro Executive Surveillance across Nasarawa State Facilities")
     
+    # Check for empty encounters dataset
+    if df_encounters is None or df_encounters.empty:
+        st.warning("⚠️ No encounter data available for the selected filters.")
+        return
+
     # Core High-Level Aggregates
     total_visits = len(df_encounters)
-    top_disease = df_encounters['Diagnosis'].mode()[0] if not df_encounters.empty else "N/A"
-    nashia_coverage = round((len(df_encounters[df_encounters['Payer'] == 'Nasarawa Health Insurance Scheme (NASHIA)']) / total_visits * 100), 1) if total_visits > 0 else 0
-    avg_wait = round(df_encounters['Wait_Time_Mins'].mean(), 1) if total_visits > 0 else 0
+    top_disease = df_encounters['Diagnosis'].mode()[0] if not df_encounters['Diagnosis'].dropna().empty else "N/A"
     
-    # Clean Narrative Briefing Box
+    nashia_count = len(df_encounters[df_encounters['Payer'] == 'Nasarawa Health Insurance Scheme (NASHIA)'])
+    nashia_coverage = round((nashia_count / total_visits * 100), 1) if total_visits > 0 else 0.0
+    avg_wait = round(df_encounters['Wait_Time_Mins'].mean(), 1) if total_visits > 0 else 0.0
+    
+    # Executive Briefing
     narrative_html = (
         f"State health facilities logged <b>{total_visits:,} total patient visits</b>. "
         f"<b>{top_disease}</b> represents the leading burden of disease. "
@@ -55,7 +62,7 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
     
     st.markdown("---")
     
-    # Commissioner Level High-Level KPIs
+    # KPI Grid
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Patients Visited", f"{total_visits:,}")
     c2.metric("Leading Disease Burden", top_disease)
@@ -70,6 +77,7 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
         st.subheader("Disease Surveillance & Outbreak Tracking")
         df_disease = df_encounters['Diagnosis'].value_counts().reset_index()
         df_disease.columns = ['Diagnosis', 'Patients Visited']
+        
         fig_disease = px.bar(
             df_disease, x='Patients Visited', y='Diagnosis', orientation='h',
             color='Patients Visited', color_continuous_scale='Reds'
@@ -86,22 +94,23 @@ def render_commissioner_view(df_encounters, df_pharmacy, df_lab):
         st.subheader("Facility Patient Share Distribution")
         df_facility = df_encounters.groupby('Hospital').size().reset_index(name='Patients Visited')
         
-        # HealthStack Donut Chart Engine Parameters
-        fig_fac = px.pie(
-            df_facility, names='Hospital', values='Patients Visited', hole=0.6,
-            color_discrete_sequence=px.colors.qualitative.Bold
-        )
-        # Prevents squeeze: puts text on outside callouts and relies on bottom legend
-        fig_fac.update_traces(
-            textposition='outside', 
-            textinfo='percent',
-            hovertemplate="<b>%{label}</b><br>Patients: %{value:,}<br>Share: %{percent}"
-        )
-        fig_fac.update_layout(
-            height=380, 
-            margin=dict(l=30, r=30, t=30, b=50), 
-            showlegend=True, 
-            legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5),
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig_fac, use_container_width=True)
+        if not df_facility.empty:
+            fig_fac = px.pie(
+                df_facility, names='Hospital', values='Patients Visited', hole=0.6,
+                color_discrete_sequence=px.colors.qualitative.Bold
+            )
+            fig_fac.update_traces(
+                textposition='outside', 
+                textinfo='percent',
+                hovertemplate="<b>%{label}</b><br>Patients: %{value:,}<br>Share: %{percent}"
+            )
+            fig_fac.update_layout(
+                height=380, 
+                margin=dict(l=30, r=30, t=30, b=50), 
+                showlegend=True, 
+                legend=dict(orientation="h", xanchor="center", x=0.5),
+                paper_bgcolor='rgba(0,0,0,0)'
+            )
+            st.plotly_chart(fig_fac, use_container_width=True)
+        else:
+            st.info("No facility data available for donut breakdown.")
