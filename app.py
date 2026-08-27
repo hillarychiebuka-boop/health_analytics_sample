@@ -1,5 +1,5 @@
 import streamlit as st
-from data_loader import load_healthcare_data
+from data_loader import generate_synthetic_healthcare_data
 from utils.filters import filter_data_by_duration
 from views.commissioner_view import render_commissioner_view
 from views.cmd_view import render_cmd_view
@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # Load Data Pipeline
-df_encounters, df_pharmacy, df_lab = load_healthcare_data()
+df_encounters, df_pharmacy, df_lab = generate_synthetic_healthcare_data()
 
 # Sidebar Navigation
 st.sidebar.image("https://img.icons8.com/color/96/hospital-2.png", width=70)
@@ -44,3 +44,4 @@ elif "2. Hospital CMD" in role:
     render_cmd_view(filtered_encounters, filtered_pharmacy, filtered_lab)
 else:
     render_hod_view(filtered_encounters, filtered_pharmacy, filtered_lab)
+    
